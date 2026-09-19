@@ -2,6 +2,7 @@
  * No private CUA endpoints, OS event injection, subprocesses or global hooks.
  */
 import {validateChoice} from './client.mjs';
+import {compileSessionOptions} from './policy.mjs';
 
 const clickable = /^(?:AX)?(?:button|link|checkbox|check box|radio button|radiobutton|menu item|menuitem|pop up button|popupbutton|tab|switch|disclosure triangle|disclosuretriangle)$/i;
 const editable = /^(?:AX)?(?:text field|textfield|text area|textarea|textbox|search field|searchfield|combobox|combo box)$/i;
@@ -180,7 +181,8 @@ function groupGuardState(raw,nodes,options,guardMode,ids) {
   }).join('\n');
 }
 
-export function createSession(options) {
+export function createSession(inputOptions) {
+  const options=compileSessionOptions(inputOptions);
   if (!options?.target || !['app','tab'].includes(options.kind) || !options.goal?.trim()) throw new Error('INVALID_SESSION');
   if (!options.targetName || typeof options.verify !== 'function') throw new Error('REQUIRE_TARGET_AND_LOCAL_VERIFIER');
   if (typeof options.client !== 'function') throw new Error('RUNNER_REQUIRES_CLIENT');

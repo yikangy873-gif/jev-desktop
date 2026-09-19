@@ -18,6 +18,18 @@ test('CUA runner requires an injected client before any UI read',()=>{
   assert.equal(reads,0);
 });
 
+test('session snapshots nested action policy at construction',async()=>{
+  const target=mockTarget();const sequence=['fill_1_0','click_2','click_3'];
+  const client=async(_state,questions)=>({answers:{next:choice(questions.next.criteria,sequence.shift())},usage:{}});
+  const options=opts(target,client);const session=createSession(options);
+  options.clickLabels.splice(0,options.clickLabels.length,'Different button');
+  options.textSlots[0].fieldLabel='Different field';
+  options.textSlots[0].value='Changed after construction';
+  const result=await session.run();
+  assert.equal(result.status,'done');
+  assert.deepEqual(target.actions,[['setValue',1,'Jev Desktop'],['click',2],['click',3]]);
+});
+
 test('parses browser/native AX indices, multiword roles, values and checks',()=>{
   const nodes=parseAX(screen('hello',true));
   assert.equal(nodes[0].role,'AXWebArea');assert.equal(nodes[1].value,'hello');assert.equal(nodes[2].checked,true);
