@@ -33,6 +33,8 @@ When CUA does not inherit the host proxy, run `node scripts/bridge-server.mjs --
 
 The Cline-inspired adapter reuses a bounded session and its history, returns compact timing by default, and optionally captures one final screenshot for Codex (`captureFinalScreenshot:true`). Screenshots never go to Jev. Prepared `fillGroups` can reduce model calls for independent fields while retaining a fresh observation after every mutation. Strict freshness is the default; scoped freshness requires explicit local scope/context checks. Reactive forms should use individual fills.
 
+Session construction snapshots the allowed labels, prepared text-slot metadata, fill groups, keys and observations into immutable policy containers. Later mutation of the caller's arrays or records cannot expand an active session's authority. Exact label strings remain preferred; regular expressions are cloned and must be bounded, non-blanket patterns without stateful flags.
+
 ### Reference adaptation
 
 Architecture reference: [Cline jev-browser](https://github.com/cline/plugins/tree/main/plugins/jev-browser), inspected at commit `96bde661f630ec23c1ce0cd86a2361a9959ef65a`, package version 0.2.2. This is an original Codex adaptation, not a drop-in Cline plugin or a copy of its implementation.
