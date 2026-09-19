@@ -1,0 +1,20 @@
+{
+  "name": "jev-desktop",
+  "version": "0.1.1+codex.20260919041214",
+  "description": "Accelerate native Mac apps and browser workflows with TypeSafe Jev inside Codex Computer Use.",
+  "author": {
+    "name": "yikangy873-gif"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Jev Desktop",
+    "shortDescription": "Jev \u52a0\u901f\u539f\u751f\u684c\u9762\u4e0e\u6d4f\u89c8\u5668\u64cd\u4f5c",
+    "longDescription": "Codex \u8d1f\u8d23\u89c4\u5212\uff0cTypeSafe Jev \u5728 Computer Use \u5185\u8fde\u7eed\u9009\u62e9\u5e76\u6267\u884c\u6709\u9650\u52a8\u4f5c\u3002\u652f\u6301\u4e2d\u82f1\u6587\u8f85\u52a9\u529f\u80fd\u63a7\u4ef6\u3001\u672c\u673a\u7ed3\u679c\u9a8c\u8bc1\u548c\u9047\u5230\u5f02\u5e38\u65f6\u8fd4\u56de Codex\u3002",
+    "developerName": "yikangy873-gif",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": [
+      "\u7528 Jev \u684c\u9762\u52a0\u901f\u5e2e\u6211\u64cd\u4f5c\u5e94\u7528\u5e76\u9a8c\u8bc1\u7ed3\u679c\u3002"
+    ]
+  }
+}

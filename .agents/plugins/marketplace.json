@@ -1,0 +1,20 @@
+{
+  "name": "yikangy873-plugins",
+  "interface": {
+    "displayName": "Yikangy873 Plugins"
+  },
+  "plugins": [
+    {
+      "name": "jev-desktop",
+      "source": {
+        "source": "local",
+        "path": "./plugins/jev-desktop"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

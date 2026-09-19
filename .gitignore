@@ -1,0 +1,9 @@
+.DS_Store
+**/__pycache__/
+*.py[cod]
+node_modules/
+.env
+.env.*
+*.log
+coverage/
+plugins/jev-desktop/docs/superpowers/
