@@ -2,8 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {createSession, parseAX, buildActions} from '../scripts/runner.mjs';
+import {decision} from './helpers/decision.mjs';
 
-const answer=(q,id)=>({answers:{next:{choice:id,confidence:1,probabilities:Object.fromEntries(Object.keys(q.next.criteria).map(k=>[k,k===id?1:0]))}}});
+const firstDecision=q=>{
+  const head=Object.entries(q).find(([name])=>name!=='operation')?.[1];
+  return decision(q,Object.keys(head.criteria)[0]);
+};
 const slots=[{name:'first',fieldLabel:'First',value:'private-alpha'},{name:'second',fieldLabel:'Second',value:'private-beta'}];
 test('static labels beside unique editable fields do not disable prepared groups',async()=>{
   const f=setup({fillGroups:[{name:'draft',slots:[0,1]}]});
@@ -26,7 +30,7 @@ function setup(extra={}) {
   const options={target,kind:'tab',targetName:'Fixture',goal:'Fill form',shareWithTypeSafe:true,textSlots:slots,
     guardMode:'scoped',scopeCheck:()=>true,decisionContext:()=>({page:'form'}),
     verify:()=>values.every((v,i)=>v===slots[i].value),
-    client:async(s,q)=>{sent.push({s,q});return answer(q,Object.keys(q.next.criteria)[0]);},...extra};
+    client:async(s,q)=>{sent.push({s,q});return firstDecision(q);},...extra};
   return {options,target,values,actions,sent,get reads(){return reads;}};
 }
 
@@ -47,7 +51,7 @@ test('scoped guard ignores unrelated ticker text while strict guard preserves fu
 test('scoped guard rejects changed permission during model await even with identical AX',async()=>{
   let permitted=true; const f=setup({scopeCheck:()=>permitted});
   f.target.getAXState=async()=>'0 AXWebArea Form\n  1 text field First\n  2 text field Second';
-  f.options.client=async(s,q)=>{permitted=false;return answer(q,'fill_1_0');};
+  f.options.client=async(s,q)=>{permitted=false;return decision(q,'fill_1_0');};
   const result=await createSession(f.options).run();assert.equal(result.status,'scope_changed');assert.equal(f.actions.length,0);
 });
 
@@ -56,7 +60,7 @@ for(const change of ['index','root','parent','context','observation','value','st
   const raw=()=>`${change==='root'&&changed?'9 AXWebArea Other':'0 AXWebArea Page'}\n  5 group ${change==='parent'&&changed?'Other':'Form'}\n    ${change==='index'&&changed?2:1} checkbox Go${change==='value'&&changed?', Value: 1':''}${change==='state'&&changed?' [selected]':''}`;
   const f=setup({textSlots:[],clickLabels:['Go'],verify:()=>clicked.length>0,decisionContext:()=>({v:change==='context'&&changed}),observations:[{name:'ready',test:()=>change==='observation'&&changed}]});
   f.target.getAXState=async()=>raw();f.target.click=async id=>clicked.push(id);
-  f.options.client=async(s,q)=>{calls++;changed=true;return answer(q,Object.keys(q.next.criteria)[0]);};
+  f.options.client=async(s,q)=>{calls++;changed=true;return firstDecision(q);};
   assert.equal((await createSession(f.options).run()).status,'done');assert.equal(calls,2);assert.deepEqual(clicked,[change==='index'?2:1]);
 });
 
@@ -65,7 +69,8 @@ test('fill groups choose once, observe between fields, save requests and reads, 
   const result=await createSession(f.options).run();assert.equal(result.status,'done');assert.equal(result.requests,1);assert.equal(result.steps,1);
   assert.equal(result.trace[0].kind,'fillGroup');assert.equal(result.mutationCount,2);assert.equal(f.reads,4);
   assert.deepEqual(f.actions,[[1,slots[0].value],[2,slots[1].value]]);
-  assert.deepEqual(Object.keys(f.sent[0].q.next.criteria),['fill_group_0','DONE','BLOCKED']);
+  assert.deepEqual(Object.keys(f.sent[0].q.operation.criteria),['FILL_GROUP','DONE','BLOCKED']);
+  assert.deepEqual(Object.keys(f.sent[0].q.fill_group_target.criteria),['fill_group_0']);
   for(const value of slots.map(s=>s.value)) {assert.ok(!JSON.stringify(f.sent).includes(value));assert.ok(!JSON.stringify(result).includes(value));}
   const serial=setup();assert.equal((await createSession(serial.options).run()).status,'done');assert.equal(serial.sent.length,2);assert.equal(serial.reads,5);
   assert.equal(result.timing.observe.count,4);assert.equal(result.timing.decision.count,1);assert.equal(result.timing.action.count,2);
@@ -109,7 +114,7 @@ test('scoped guard rechooses when ancestor state changes without changing labels
   let changed=false,calls=0,actions=0;
   const f=setup({textSlots:[],clickLabels:['Go'],verify:()=>actions>0});
   f.target.getAXState=async()=>`0 AXWebArea Form\n  5 group Panel${changed?' [selected]':''}\n    1 button Go`;
-  f.target.click=async()=>{actions++;};f.options.client=async(s,q)=>{calls++;changed=true;return answer(q,'click_1');};
+  f.target.click=async()=>{actions++;};f.options.client=async(s,q)=>{calls++;changed=true;return decision(q,'click_1');};
   assert.equal((await createSession(f.options).run()).status,'done');assert.equal(calls,2);
 });
 
@@ -140,7 +145,7 @@ test('scoped guard rejects candidate state metadata changes beyond checked and s
   let changed=false,calls=0,actions=0;
   const f=setup({textSlots:[],clickLabels:['Go'],verify:()=>actions>0});
   f.target.getAXState=async()=>`0 AXWebArea Form\n  1 button Go, Expanded: ${changed}`;
-  f.options.clickLabels=[/^Go/];f.target.click=async()=>{actions++;};f.options.client=async(s,q)=>{calls++;changed=true;return answer(q,'click_1');};
+  f.options.clickLabels=[/^Go/];f.target.click=async()=>{actions++;};f.options.client=async(s,q)=>{calls++;changed=true;return decision(q,'click_1');};
   assert.equal((await createSession(f.options).run()).status,'done');assert.equal(calls,2);
 });
 
@@ -148,7 +153,7 @@ for(const metadata of ['root-url','ancestor-value','candidate-metadata']) test(`
   let changed=false,calls=0,actions=0;
   const f=setup({textSlots:[],clickLabels:['Go'],verify:()=>actions>0});
   f.target.getAXState=async()=>`0 AXWebArea Form, URL: /${metadata==='root-url'&&changed?'other':'first'}\n  5 group Panel, Value: ${metadata==='ancestor-value'&&changed?'other':'first'}\n    1 button Go, ID: go, Expanded: ${metadata==='candidate-metadata'&&changed}`;
-  f.target.click=async()=>{actions++;};f.options.client=async(s,q)=>{calls++;changed=true;return answer(q,'click_1');};
+  f.target.click=async()=>{actions++;};f.options.client=async(s,q)=>{calls++;changed=true;return decision(q,'click_1');};
   assert.equal((await createSession(f.options).run()).status,'done');assert.equal(calls,2);assert.equal(actions,1);
 });
 

@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseAX,buildActions,createSession} from '../scripts/runner.mjs';
+import * as runner from '../scripts/runner.mjs';
 import {validateChoice,createClient,endpoint} from '../scripts/client.mjs';
+import {choice,decision} from './helpers/decision.mjs';
+
+const {parseAX,buildActions,createSession}=runner;
 
 const screen=(value='',checked=false,result='尚未预览')=>`0 AXWebArea Test\n  1 text field 项目名称, Value: ${value}\n  2 checkbox 启用提醒${checked?' [checked]':''}\n  3 button 预览结果\n  4 text ${result}`;
-const choice=(criteria,id,confidence=.99)=>({choice:id,confidence,probabilities:Object.fromEntries(Object.keys(criteria).map(k=>[k,k===id?1:0]))});
 function mockTarget(){
   let value='',checked=false,result='尚未预览';const actions=[];
   return {actions,getAXState:async()=>screen(value,checked,result),setValue:async(id,text)=>{assert.equal(id,1);value=text;actions.push(['setValue',id,text]);},click:async id=>{actions.push(['click',id]);if(id===2)checked=!checked;if(id===3)result=`预览：${value}；提醒：${checked?'已启用':'未启用'}`;},pressKey:async(...args)=>actions.push(['key',...args])};
@@ -20,7 +22,7 @@ test('CUA runner requires an injected client before any UI read',()=>{
 
 test('session snapshots nested action policy at construction',async()=>{
   const target=mockTarget();const sequence=['fill_1_0','click_2','click_3'];
-  const client=async(_state,questions)=>({answers:{next:choice(questions.next.criteria,sequence.shift())},usage:{}});
+  const client=async(_state,questions)=>({...decision(questions,sequence.shift()),usage:{}});
   const options=opts(target,client);const session=createSession(options);
   options.clickLabels.splice(0,options.clickLabels.length,'Different button');
   options.textSlots[0].fieldLabel='Different field';
@@ -41,7 +43,7 @@ test('session rejects broad or stateful label regexes before reading the UI',()=
 test('narrow label regexes remain supported',async()=>{
   let clicked=false;
   const target={getAXState:async()=>`1 button Preview result\n2 text ${clicked?'done':'waiting'}`,click:async id=>{assert.equal(id,1);clicked=true;}};
-  const client=async(_state,questions)=>({answers:{next:choice(questions.next.criteria,'click_1')},usage:{}});
+  const client=async(_state,questions)=>({...decision(questions,'click_1'),usage:{}});
   const session=createSession(opts(target,client,{clickLabels:[/Preview(?: result)?/i],textSlots:[],verify:raw=>raw.includes('done')}));
   assert.equal((await session.run()).status,'done');
 });
@@ -62,6 +64,26 @@ test('only scoped actions; filled fields excluded; sensitive and consequential c
   const {candidates,deferred}=buildActions(nodes,opts({},null,{clickLabels:['删除文件','预览结果']}));
   assert.deepEqual(candidates.map(x=>x.id),['click_3']);assert.equal(deferred,1);
 });
+test('builds one operation head plus operation-specific target heads',()=>{
+  const candidates=buildActions(parseAX(screen()),opts({},null)).candidates;
+  const space=runner.buildDecisionSpace(candidates);
+  assert.deepEqual(Object.keys(space.operations),['TYPE_TEXT','CLICK','DONE','BLOCKED']);
+  assert.deepEqual(Object.keys(space.questions),['operation','type_text_target','click_target']);
+  assert.deepEqual(Object.keys(space.targets.TYPE_TEXT),['fill_1_0']);
+  assert.deepEqual(Object.keys(space.targets.CLICK),['click_2','click_3']);
+  assert.match(JSON.stringify(space.questions.click_target.instructions.rules),/untrusted data/i);
+});
+test('sends every speculative target head in one request and consumes the selected head only',async()=>{
+  const target=mockTarget();let calls=0,seen;
+  const client=async(_state,questions)=>{
+    calls++;seen=questions;
+    return {...decision(questions,'fill_1_0'),answers:{...decision(questions,'fill_1_0').answers,click_target:{choice:'forged'}}};
+  };
+  const result=await createSession(opts(target,client,{verify:()=>target.actions.length===1})).run();
+  assert.equal(result.status,'done');assert.equal(calls,1);
+  assert.deepEqual(Object.keys(seen),['operation','type_text_target','click_target']);
+  assert.deepEqual(target.actions,[['setValue',1,'Jev Desktop']]);
+});
 test('rejects forged, incomplete, nonfinite and non-maximal model distributions',()=>{
   const criteria={a:'',b:''};assert.throws(()=>validateChoice({choice:'evil'},criteria));
   assert.throws(()=>validateChoice({choice:'a',confidence:1,probabilities:{a:1}},criteria));
@@ -70,46 +92,72 @@ test('rejects forged, incomplete, nonfinite and non-maximal model distributions'
 });
 test('three decisions execute in one run and verify; unrelated UI/text content never transmitted',async()=>{
   const target=mockTarget();const sequence=['fill_1_0','click_2','click_3'];const states=[];
-  const client=async(state,questions)=>{states.push(state);return {answers:{next:choice(questions.next.criteria,sequence.shift())},latencyMs:1,usage:{input_tokens:100}};};
+  const client=async(state,questions)=>{states.push(state);return {...decision(questions,sequence.shift()),latencyMs:1,usage:{input_tokens:100}};};
   const session=createSession(opts(target,client));const result=await session.run();
   assert.equal(result.status,'done');assert.equal(result.steps,3);assert.equal(result.requests,3);assert.equal(result.usage.input_tokens,300);
-  assert.equal(result.verified,true);assert.equal(states[0].controls[0].value,undefined);
+  assert.equal(result.verified,true);assert.equal(states[0].elements[0].value,undefined);
   assert.equal((await session.run()).status,'done');
 });
 test('stale state cancels selection and regenerates before clicking',async()=>{
   let snapshot=0;const calls=[];let decisions=0;
   const target={getAXState:async()=>++snapshot===1?'1 button Go':'2 button Go',click:async id=>calls.push(id)};
-  const client=async(s,q)=>({answers:{next:choice(q.next.criteria,++decisions===1?'click_1':'click_2')},usage:{}});
+  const client=async(s,q)=>({...decision(q,++decisions===1?'click_1':'click_2'),usage:{}});
   const session=createSession(opts(target,client,{clickLabels:['Go'],textSlots:[],verify:()=>calls.length===1}));
   const result=await session.run();assert.equal(result.status,'done');assert.deepEqual(calls,[2]);assert.equal(decisions,2);
 });
-test('low confidence escalates without mutating',async()=>{
-  const target=mockTarget();const client=async(s,q)=>({answers:{next:choice(q.next.criteria,'click_2',.2)}});
+test('low operation confidence escalates without mutating',async()=>{
+  const target=mockTarget();const client=async(s,q)=>decision(q,'click_2',.2);
   const result=await createSession(opts(target,client)).run();assert.equal(result.status,'low_confidence');assert.equal(target.actions.length,0);
 });
+test('low selected-target confidence escalates without mutating',async()=>{
+  const target=mockTarget();const client=async(s,q)=>{
+    const result=decision(q,'click_2');
+    result.answers.click_target=choice(q.click_target.criteria,'click_2',.2);
+    return result;
+  };
+  const result=await createSession(opts(target,client)).run();assert.equal(result.status,'low_confidence');assert.equal(target.actions.length,0);
+});
+test('legacy trace probability conservatively combines operation and target heads',async()=>{
+  const target=mockTarget();const client=async(s,q)=>{
+    const result=decision(q,'click_2');
+    const operation=result.answers.operation;
+    for(const key of Object.keys(operation.probabilities)) operation.probabilities[key]=0;
+    operation.probabilities.CLICK=.71;operation.probabilities.DONE=.29;
+    return result;
+  };
+  const result=await createSession(opts(target,client,{verify:()=>target.actions.length===1})).run();
+  assert.equal(result.status,'done');assert.equal(result.trace[0].operationProbability,.71);
+  assert.equal(result.trace[0].targetProbability,1);assert.equal(result.trace[0].probability,.71);
+});
+test('invalid selected target head fails closed without mutating',async()=>{
+  const target=mockTarget();const client=async(s,q)=>{
+    const result=decision(q,'click_2');result.answers.click_target={choice:'forged'};return result;
+  };
+  const result=await createSession(opts(target,client)).run();assert.equal(result.status,'error');assert.equal(target.actions.length,0);
+});
 test('DONE is not accepted without independent evidence',async()=>{
-  const client=async(s,q)=>({answers:{next:choice(q.next.criteria,'DONE')}});
+  const client=async(s,q)=>decision(q,'DONE');
   const result=await createSession(opts(mockTarget(),client)).run();assert.equal(result.status,'failed_verification');
 });
 test('uncertain mutation is consumed, poisoned and never replayed',async()=>{
   const target=mockTarget();let attempted=0;target.click=async()=>{attempted++;throw Error('UI timed out');};
-  const client=async(s,q)=>({answers:{next:choice(q.next.criteria,'click_2')}});
+  const client=async(s,q)=>decision(q,'click_2');
   const session=createSession(opts(target,client));assert.equal((await session.run()).status,'needs_inspection');
   assert.equal((await session.run()).status,'needs_inspection');assert.equal(attempted,1);
 });
 test('cancellation while model request is in flight prevents action',async()=>{
-  let release;const target=mockTarget();const client=async(s,q)=>{await new Promise(r=>release=r);return {answers:{next:choice(q.next.criteria,'click_2')}};};
+  let release;const target=mockTarget();const client=async(s,q)=>{await new Promise(r=>release=r);return decision(q,'click_2');};
   const session=createSession(opts(target,client));const pending=session.run();
   await new Promise(r=>setImmediate(r));session.cancel();release();assert.equal((await pending).status,'cancelled');assert.equal(target.actions.length,0);
 });
 test('bounded chunks resume without reusing stale indices',async()=>{
   const target=mockTarget();const sequence=['fill_1_0','click_2','click_3'];
-  const client=async(s,q)=>({answers:{next:choice(q.next.criteria,sequence.shift())}});
+  const client=async(s,q)=>decision(q,sequence.shift());
   const session=createSession(opts(target,client));assert.equal((await session.run({maxActions:1})).status,'yielded');assert.equal((await session.run()).status,'done');
 });
 test('native and tab shortcuts use their correct CUA signature',async()=>{
   for(const kind of ['app','tab']){
-    const target=mockTarget();const client=async(s,q)=>({answers:{next:choice(q.next.criteria,'key_0')}});
+    const target=mockTarget();const client=async(s,q)=>decision(q,'key_0');
     const session=createSession(opts(target,client,{kind,keys:[{key:'Escape',description:'Close menu'}],verify:()=>target.actions.length>0}));
     assert.equal((await session.run()).status,'done');assert.deepEqual(target.actions,[kind==='app'?['key','Escape']:['key',null,'Escape']]);
   }
@@ -134,7 +182,7 @@ test('Baidu text entry area uses stable ID before and after filling',()=>{
 test('explicit pending page finishes through observation without another model call',async()=>{
   let clicked=false,reads=0,requests=0;
   const target={getAXState:async()=>!clicked?'1 button Search':++reads<3?'0 AXWebArea Loading':'0 AXWebArea Results',click:async()=>{clicked=true;}};
-  const client=async(s,q)=>{requests++;return {answers:{next:choice(q.next.criteria,'click_1')}};};
+  const client=async(s,q)=>{requests++;return decision(q,'click_1');};
   const session=createSession(opts(target,client,{textSlots:[],clickLabels:['Search'],verify:raw=>raw.includes('Results'),isPending:raw=>raw.includes('Loading')}));
   const result=await session.run();
   assert.equal(result.status,'done');assert.equal(requests,1);assert.equal(result.steps,1);

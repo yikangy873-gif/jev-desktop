@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createCodexJev} from '../scripts/codex-adapter.mjs';
+import {decision} from './helpers/decision.mjs';
 
-const choice=(q,id)=>({answers:{next:{choice:id,confidence:1,probabilities:Object.fromEntries(Object.keys(q.next.criteria).map(k=>[k,k===id?1:0]))}}});
 function fixture(kind='tab') {
   let stage=0,reads=0,screenshots=0;const calls=[],states=[];
   const image=Buffer.from('fixture screenshot');
@@ -10,7 +10,7 @@ function fixture(kind='tab') {
     click:async id=>{calls.push(id);stage++;},getScreenshot:async options=>{assert.deepEqual(options,{emit:false});screenshots++;return image;},
     close:()=>assert.fail('must not close caller target')};
   const options={target,kind,targetName:'Fixture',goal:'Reach stage two',shareWithTypeSafe:true,clickLabels:['Next'],verify:()=>stage===2,
-    client:async(s,q)=>{states.push(s);return choice(q,'click_1');}};
+    client:async(s,q)=>{states.push(s);return decision(q,'click_1');}};
   return {target,options,calls,states,image,get reads(){return reads;},get screenshots(){return screenshots;}};
 }
 
@@ -56,13 +56,13 @@ test('missing screenshot support is unavailable without affecting execution',asy
 });
 
 test('concurrent run rejects while a decision is pending',async()=>{
-  const f=fixture();let release;f.options.client=async(s,q)=>{await new Promise(r=>release=r);return choice(q,'click_1');};
+  const f=fixture();let release;f.options.client=async(s,q)=>{await new Promise(r=>release=r);return decision(q,'click_1');};
   const adapter=createCodexJev(f.options),pending=adapter.run({maxActions:1});await new Promise(r=>setImmediate(r));
   await assert.rejects(adapter.run(),/ALREADY_RUNNING/);assert.equal(adapter.state().running,true);release();assert.equal((await pending).status,'yielded');assert.equal(adapter.state().running,false);
 });
 
 test('stop during model await cancels permanently without screenshot or target closure',async()=>{
-  const f=fixture();let release;f.options.client=async(s,q)=>{await new Promise(r=>release=r);return choice(q,'click_1');};
+  const f=fixture();let release;f.options.client=async(s,q)=>{await new Promise(r=>release=r);return decision(q,'click_1');};
   const adapter=createCodexJev(f.options),pending=adapter.run({captureFinalScreenshot:true});await new Promise(r=>setImmediate(r));
   assert.equal(adapter.stop().status,'cancelled');release();const result=await pending;assert.equal(result.status,'cancelled');assert.equal(result.screenshotStatus,'unavailable');assert.equal(f.calls.length,0);assert.equal(f.screenshots,0);
   const reads=f.reads;assert.equal((await adapter.run({captureFinalScreenshot:true})).status,'cancelled');assert.equal(f.reads,reads);assert.equal(f.screenshots,0);

@@ -6,7 +6,7 @@
 Speed up bounded browser and macOS workflows by combining Codex, TypeSafe Jev, and the existing Computer Use runtime.
 
 - **Codex** understands the goal, prepares text, limits the permitted actions, and verifies the result.
-- **Jev** selects the next action from the current closed set.
+- **Jev** selects an operation and its operation-specific target in one request from the current closed set.
 - **Computer Use** observes the interface and performs the actual click, fill, scroll, or shortcut.
 
 The project is an original Codex adaptation inspired by Cline's `jev-browser`. It does not install a second browser controller or use private Computer Use APIs.
@@ -14,11 +14,12 @@ The project is an original Codex adaptation inspired by Cline's `jev-browser`. I
 ## Highlights
 
 - Reuses one bounded Jev session instead of returning to the main agent after every click.
+- Sends one operation head plus every compatible target head per observation, then validates and consumes only the selected head.
 - Keeps screenshots, complete accessibility trees, and prepared field values local.
 - Keeps the TypeSafe API key outside the restricted Computer Use runtime.
 - Re-observes before mutations and never automatically retries an uncertain action.
 - Returns consequential actions such as publishing, payment, deletion, and authorization to Codex.
-- Includes 115 automated tests for action scoping, stale-state protection, transport, cancellation, and the authenticated loopback bridge.
+- Includes 123 automated tests for multi-head selection, action scoping, stale-state protection, transport, cancellation, and the authenticated loopback bridge.
 
 ## Install
 

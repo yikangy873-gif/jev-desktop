@@ -79,6 +79,10 @@ Use the actual user-selected browser ID in place of `chrome`. The helper creates
 
 ## Run a bounded task
 
+Each observation is converted into scoped indexed elements with supported operations. The runner sends one TypeSafe request containing an `operation` head and every compatible target head, then validates and consumes only the head selected by `operation`. Operation and selected-target confidence are checked independently. This follows the Jev Ultrafast policy shape while keeping execution inside CUA.
+
+`TYPE_TEXT` does not call OpenRouter or another text model. It selects a permitted field and a caller-prepared `textSlots` entry; the literal value stays local and CUA performs the fill. If the required value is not already known and authorized, stop and ask or let Codex prepare it before creating the session.
+
 In the next CUA call import the bridge client and adapter using the absolute resolved plugin path. Its bounded-session design references Cline's `jev-browser`, but executes through the existing CUA binding, not an independent browser or extra MCP server:
 
 ```js

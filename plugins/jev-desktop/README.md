@@ -4,7 +4,7 @@ A local Codex skill plugin that runs TypeSafe Jev's decision loop **inside the e
 
 Ask Codex: **“用 Jev 桌面加速操作 [应用]，完成 [明确目标]。”**
 
-The current release supports observed, indexed buttons, links, checkboxes, editable fields, scoped scrolling and prepared shortcuts. Chinese macOS role names are supported. Codex prepares text and task scope; Jev selects among allowed actions; the local verifier checks the outcome. Visual-only UI and unfamiliar screens return to Codex.
+The current release supports observed, indexed buttons, links, checkboxes, editable fields, scoped scrolling and prepared shortcuts. Chinese macOS role names are supported. Codex prepares text and task scope; Jev selects an operation and its compatible target in one request; the local verifier checks the outcome. Visual-only UI and unfamiliar screens return to Codex.
 
 ## Installation
 
@@ -23,7 +23,11 @@ Run `python3 scripts/setup.py`, open the loopback setup URL and enter the TypeSa
 
 ## Operation
 
-Version 0.1.1 routes deterministic operations before Jev: a known search URL or short known CUA sequence needs no model decision. `scripts/fast-path.mjs` provides `searchBaidu({cua,browser,query})` (or an explicitly reusable `tab`). It returns verified status and separate opening/verification/total timings, with zero Jev requests. These times exclude Codex planning and browser bootstrap. Native app support remains in the shared CUA runner; the Baidu helper does not generalize to other apps.
+Version 0.2.0 routes deterministic operations before Jev: a known search URL or short known CUA sequence needs no model decision. `scripts/fast-path.mjs` provides `searchBaidu({cua,browser,query})` (or an explicitly reusable `tab`). It returns verified status and separate opening/verification/total timings, with zero Jev requests. These times exclude Codex planning and browser bootstrap. Native app support remains in the shared CUA runner; the Baidu helper does not generalize to other apps.
+
+For dynamic work, every observation becomes a scoped indexed element table. One TypeSafe request contains an `operation` head and every compatible operation-specific target head, such as `click_target` and `type_text_target`. The runner validates and consumes only the target head selected by `operation`; malformed speculative heads for operations that were not selected cannot execute. Operation and selected-target confidence are gated independently.
+
+This integrates the core policy shape from Jev Ultrafast without changing the execution boundary. Codex Computer Use still observes and mutates the approved app or tab, stale-state and outcome checks remain local, and `TYPE_TEXT` selects a caller-prepared `textSlots` value rather than asking a second model to invent text. OpenRouter and Browser Harness are not runtime dependencies.
 
 The runner also recognizes Baidu's `text entry area` and stable field IDs, and supports explicitly scoped `isPending` UI states without unnecessary model requests. Pending checks and direct-search verification are bounded; uncertain mutations are never automatically replayed.
 
@@ -54,7 +58,7 @@ The plugin does not change Codex's main model, global permissions or OS settings
 
 ## Data boundary
 
-Only scoped goals, permitted control labels, checked/selected flags, filled-slot IDs, boolean observations and recent action descriptions go to TypeSafe. Full AX snapshots and typed values remain local unless a caller includes them elsewhere in the request. No screenshot is sent to Jev. Redaction is heuristic; the invoking Codex must limit sensitive data before invoking it. The key is never returned by the runtime or logs.
+Only scoped goals, indexed permitted elements, their supported operations, checked/selected flags, filled-slot IDs, boolean observations, operation-specific target metadata and recent action descriptions go to TypeSafe. Full AX snapshots and typed values remain local unless a caller includes them elsewhere in the request. No screenshot is sent to Jev. Redaction is heuristic; the invoking Codex must limit sensitive data before invoking it. The key is never returned by the runtime or logs.
 
 The fast loop hands consequential actions back to Codex and does not infer permission from confidence. A poisoned session never retries uncertain mutations. OS/UI calls cannot be forcibly interrupted by this library; task cancellation prevents subsequent actions.
 
@@ -62,7 +66,7 @@ The fast loop hands consequential actions back to Codex and does not infer permi
 
 `node --test tests/*.test.mjs`
 
-Current source validation (2026-09-19): 115 automated tests passed before final installation validation. The authenticated loopback bridge then completed a real end-to-end browser task through CUA: three real TypeSafe decisions selected a four-field prepared group, reminder checkbox and preview; six mutations and ten AX observations finished in 3.949 seconds with independent visible-result verification. Decision time was 1.699 seconds, action time 0.083 seconds and observation time 2.157 seconds. This excludes Codex planning, bridge/page startup and app launch and is not a controlled speedup comparison. A prior deterministic-selector executor-only run was 3.033 seconds; a native TextEdit attempt still timed out independently, so arbitrary native-app support is not established.
+Current source validation (2026-09-19): 123 automated tests pass, including the operation/target multi-head contract. Before that integration, the authenticated loopback bridge completed a real end-to-end browser task through CUA: three real TypeSafe decisions selected a four-field prepared group, reminder checkbox and preview; six mutations and ten AX observations finished in 3.949 seconds with independent visible-result verification. Decision time was 1.699 seconds, action time 0.083 seconds and observation time 2.157 seconds. This excludes Codex planning, bridge/page startup and app launch and is not a controlled speedup comparison. A prior deterministic-selector executor-only run was 3.033 seconds; a native TextEdit attempt still timed out independently, so arbitrary native-app support is not established.
 
 Live smoke tests on 2026-09-19 used the real TypeSafe `jev-1.13.0` API:
 
@@ -83,4 +87,4 @@ Excludes Codex planning, module preparation, app launch and earlier native-servi
 
 An earlier development sample spent 27.082s opening a Chrome tab, exhausting its soft budget before verification; this led to the final-observation fix. Retained as a slow sample, not omitted from conclusions. All are single samples, not a statistically controlled speedup, and none measures time from the user's message to the final chat reply. Browser transport/navigation/observation remains the dominant unresolved latency in these samples.
 
-Architecture reference: https://github.com/browser-use/jev-ultrafast (dynamic closed-set action selection). This implementation uses Codex CUA for execution, not Browser Harness. TypeSafe protocol: https://docs.typesafe.ai/api.
+Architecture reference: https://github.com/browser-use/jev-ultrafast (single-request operation and operation-specific target heads over a dynamic closed set). This implementation uses Codex CUA for execution, not Browser Harness, and prepared local text rather than OpenRouter. TypeSafe protocol: https://docs.typesafe.ai/api.
