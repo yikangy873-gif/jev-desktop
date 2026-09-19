@@ -21,17 +21,20 @@ export async function createLocalBridgeClient({descriptorPath=defaultBridgeDescr
   const descriptor=await loadBridgeDescriptor(descriptorPath);
   if(typeof fetchImpl!=='function')throw new Error('BRIDGE_FETCH_UNAVAILABLE');
   return async(state,questions,{signal,timeoutMs=7000}={})=>{
-    const started=performance.now(),timeout=AbortSignal.timeout(Math.max(1,Math.round(timeoutMs)));
-    const requestSignal=signal?AbortSignal.any([signal,timeout]):timeout;
-    let response;
+    const started=performance.now(),timeoutController=new AbortController();
+    const timeoutId=setTimeout(()=>timeoutController.abort(),Math.max(1,Math.round(timeoutMs)));
+    const requestSignal=signal?AbortSignal.any([signal,timeoutController.signal]):timeoutController.signal;
     try {
-      response=await fetchImpl(descriptor.url,{method:'POST',redirect:'error',headers:{Authorization:`Bridge ${descriptor.token}`,'Content-Type':'application/json'},body:JSON.stringify({state,questions}),signal:requestSignal});
-    } catch {throw new Error(signal?.aborted?'CANCELLED':'MODEL_NETWORK_OR_TIMEOUT');}
-    if(!response.ok){const retry=Number(response.headers?.get?.('retry-after'));throw new Error(`TYPESAFE_HTTP_${response.status}${retry>0?`: retry after ${retry}s`:''}`);}
-    let data;
-    try {data=await response.json();requestSignal.throwIfAborted();}
-    catch {throw new Error(signal?.aborted?'CANCELLED':requestSignal.aborted?'MODEL_NETWORK_OR_TIMEOUT':'INVALID_MODEL_JSON');}
-    if(!data?.answers)throw new Error('INVALID_MODEL_RESPONSE');
-    return {answers:data.answers,model:data.model,usage:data.usage||{},latencyMs:Math.round(performance.now()-started)};
+      let response;
+      try {
+        response=await fetchImpl(descriptor.url,{method:'POST',redirect:'error',headers:{Authorization:`Bridge ${descriptor.token}`,'Content-Type':'application/json'},body:JSON.stringify({state,questions}),signal:requestSignal});
+      } catch {throw new Error(signal?.aborted?'CANCELLED':'MODEL_NETWORK_OR_TIMEOUT');}
+      if(!response.ok){const retry=Number(response.headers?.get?.('retry-after'));throw new Error(`TYPESAFE_HTTP_${response.status}${retry>0?`: retry after ${retry}s`:''}`);}
+      let data;
+      try {data=await response.json();requestSignal.throwIfAborted();}
+      catch {throw new Error(signal?.aborted?'CANCELLED':requestSignal.aborted?'MODEL_NETWORK_OR_TIMEOUT':'INVALID_MODEL_JSON');}
+      if(!data?.answers)throw new Error('INVALID_MODEL_RESPONSE');
+      return {answers:data.answers,model:data.model,usage:data.usage||{},latencyMs:Math.round(performance.now()-started)};
+    } finally {clearTimeout(timeoutId);}
   };
 }
