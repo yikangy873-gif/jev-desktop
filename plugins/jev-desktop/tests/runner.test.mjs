@@ -30,6 +30,22 @@ test('session snapshots nested action policy at construction',async()=>{
   assert.deepEqual(target.actions,[['setValue',1,'Jev Desktop'],['click',2],['click',3]]);
 });
 
+test('session rejects broad or stateful label regexes before reading the UI',()=>{
+  let reads=0;const target={getAXState:async()=>{reads++;return '1 button Preview';}};
+  for(const rule of [/.*/,/^.+$/,/^Preview$/g]) {
+    assert.throws(()=>createSession(opts(target,async()=>{}, {clickLabels:[rule],textSlots:[]})),/^Error: MATCH_RULE_/);
+  }
+  assert.equal(reads,0);
+});
+
+test('narrow label regexes remain supported',async()=>{
+  let clicked=false;
+  const target={getAXState:async()=>`1 button Preview result\n2 text ${clicked?'done':'waiting'}`,click:async id=>{assert.equal(id,1);clicked=true;}};
+  const client=async(_state,questions)=>({answers:{next:choice(questions.next.criteria,'click_1')},usage:{}});
+  const session=createSession(opts(target,client,{clickLabels:[/Preview(?: result)?/i],textSlots:[],verify:raw=>raw.includes('done')}));
+  assert.equal((await session.run()).status,'done');
+});
+
 test('parses browser/native AX indices, multiword roles, values and checks',()=>{
   const nodes=parseAX(screen('hello',true));
   assert.equal(nodes[0].role,'AXWebArea');assert.equal(nodes[1].value,'hello');assert.equal(nodes[2].checked,true);

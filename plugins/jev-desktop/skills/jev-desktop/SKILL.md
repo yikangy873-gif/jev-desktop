@@ -105,7 +105,7 @@ var result = await session.run({maxMs:18000, maxActions:8});
 nodeRepl.write(result);
 ```
 
-`clickLabels`, `textSlots[].fieldLabel`, and `scrollLabels` accept exact strings or narrowly scoped RegExp values. Prefer exact labels from the observed UI. Never use a blanket `/.*/` or add all controls just to make a task work. `verify`, optional `scopeCheck`, and `observations[].test(raw)` execute locally and may inspect raw AX text. They must be pure, non-mutating checks. Observe the actual result format before writing them.
+`clickLabels`, `textSlots[].fieldLabel`, and `scrollLabels` accept exact strings or narrowly scoped RegExp values. Regex rules may use only `i`, `u`, or `v` flags and cannot match empty text or every representative label; the runtime rejects blanket, stateful, or oversized patterns before reading the UI. Prefer exact labels from the observed UI. Never add all controls just to make a task work. `verify`, optional `scopeCheck`, and `observations[].test(raw)` execute locally and may inspect raw AX text. They must be pure, non-mutating checks. Observe the actual result format before writing them.
 
 Optional `keys` entries are `{key:'Escape',description:'Dismiss the currently observed menu'}`. They must come from Codex's observed/known app workflow, never Jev-generated strings. Return/Enter and delete shortcuts are deliberately excluded from this fast loop. A key that can submit or delete data must be handled outside it under the applicable task policy. Native and browser `pressKey` signatures are adapted internally.
 
