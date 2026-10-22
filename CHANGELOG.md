@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-22
+
 ### Added
 - `CONTRIBUTING.md`, `SECURITY.md`, issue templates, and a pull request template.
 - README troubleshooting section.

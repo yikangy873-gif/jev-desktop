@@ -1,7 +1,7 @@
 # Jev Desktop for Codex
 
 [![Tests](https://github.com/yikangy873-gif/jev-desktop/actions/workflows/test.yml/badge.svg)](https://github.com/yikangy873-gif/jev-desktop/actions/workflows/test.yml)
-![Version](https://img.shields.io/badge/version-0.2.0-blue)
+![Version](https://img.shields.io/badge/version-0.2.1-blue)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Jev Desktop adds a bounded decision loop to Codex Computer Use for browser tabs and native macOS apps.
@@ -71,6 +71,12 @@ type_text_target:
 ```
 
 All heads are predicted in one TypeSafe request. Only the target head selected by `operation` is validated and allowed to execute.
+
+## What's new in 0.2.1
+
+- Contributor docs: `CONTRIBUTING.md`, `SECURITY.md`, issue and PR templates.
+- README troubleshooting section.
+- CI now runs tests on Node 22 and 24, and syntax-checks scripts plus `setup.py`.
 
 ## What's new in 0.2.0
 
