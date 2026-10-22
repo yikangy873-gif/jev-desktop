@@ -18,7 +18,7 @@ The test suite runs fully offline and does not need a TypeSafe API key.
 
 - Keep changes focused; one logical change per pull request is easiest to review.
 - Add or update tests in `plugins/jev-desktop/tests/` for behavior changes.
-- Run `npm test` before opening the PR; CI runs the same suite on Node 22 and 24.
+- Run `npm test` before opening the PR; CI runs the same suite.
 - Preserve the safety model: actions must stay explicitly allowlisted, and consequential
   controls (send, publish, payment, deletion, upload, login, installation, permission
   changes) must return to Codex rather than execute in the fast loop.

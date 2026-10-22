@@ -9,10 +9,6 @@ All notable changes to this project are documented here. The format is based on
 - `CONTRIBUTING.md`, `SECURITY.md`, issue templates, and a pull request template.
 - README troubleshooting section.
 
-### Changed
-- CI now tests on Node.js 22 and 24, syntax-checks every script, and byte-compiles
-  `scripts/setup.py` on Python 3.10.
-
 ## [0.2.0] - 2026-09-19
 
 ### Added
