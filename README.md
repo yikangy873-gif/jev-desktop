@@ -179,6 +179,16 @@ The browser integration has also been exercised end-to-end with the real TypeSaf
 - CUA element-index freshness checks are not equivalent to browser DOM-node identity or occlusion checks.
 - The plugin does not change Codex's main model, global permissions, or operating-system settings.
 
+## Troubleshooting
+
+- **`doctor.mjs` reports `configured: false`**: run `python3 scripts/setup.py` from the plugin directory and enter the key in the printed loopback URL, then re-run `node scripts/doctor.mjs`.
+- **`node scripts/doctor.mjs --live` fails**: check network access to the TypeSafe API and that the key is valid. The doctor never prints the key.
+- **Plugin directory not found**: the cache path varies by Codex version; run `codex plugin list --json` to locate it.
+- **Skill not used by Codex**: start a new Codex task after installing; existing tasks do not load newly installed skills.
+- **Node.js errors on startup**: Node.js 22 or newer is required (`node --version`).
+
+Please include `node scripts/doctor.mjs` output when [opening an issue](https://github.com/yikangy873-gif/jev-desktop/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
+
 ## Architecture references
 
 - [browser-use/jev-ultrafast](https://github.com/browser-use/jev-ultrafast): dynamic operation and target-head policy
