@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format is based on
 ### Added
 - `CONTRIBUTING.md`, `SECURITY.md`, issue templates, and a pull request template.
 - README troubleshooting section.
+- CI tests on Node 22 and 24, plus syntax checks for scripts and `setup.py`.
 
 ## [0.2.0] - 2026-09-19
 
